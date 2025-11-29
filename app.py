@@ -1,46 +1,54 @@
-import joblib
-import requests
-import os
 from flask import Flask, request, jsonify
+from sentence_transformers import SentenceTransformer
+import joblib
+from deep_translator import GoogleTranslator
+from langdetect import detect
+
+print("Carico il modello HuggingFace...")
+embedder = SentenceTransformer("sentence-transformers/paraphrase-MiniLM-L6-v2")
+
+print("Carico scaler, pca, label encoder...")
+scaler = joblib.load("scaler.pkl")
+pca = joblib.load("pca.pkl")
+label_encoder = joblib.load("label_encoder.pkl")
+
+print("Modelli caricati.")
 
 app = Flask(__name__)
 
-MODEL_URL = "https://drive.google.com/uc?export=download&id=176bL6Ez1X2K9JMe9qZ0idO2lxE98at78"
-MODEL_PATH = "pipelineWEB.pkl"
-
-
-def download_model():
-    if not os.path.exists(MODEL_PATH):
-        print("Scarico il modello da Google Drive...")
-        response = requests.get(MODEL_URL, stream=True)
-
-        if response.status_code != 200:
-            raise Exception(f"Errore download: {response.status_code}")
-
-        with open(MODEL_PATH, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-
-        print("Modello scaricato correttamente!")
-
-
-print("Controllo modello...")
-download_model()
-pipeline = joblib.load(MODEL_PATH)
-print("Modello caricato!")
-
-
-@app.route("/")
-def home():
-    return "API online!"
-
-
 @app.route("/predict", methods=["POST"])
 def predict():
-    data = request.json.get("text", "")
-    prediction = pipeline.predict([data])[0]
-    return jsonify({"prediction": prediction})
+    try:
+        data = request.json
+        frase = data.get("text", "")
+
+        # Traduzione verso inglese
+        frase_en = GoogleTranslator(source='auto', target='en').translate(frase)
+
+        # Lingua originale
+        lang = detect(frase)
+
+        # Embedding
+        emb = embedder.encode(
+            [frase_en],
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
+
+        emb_scaled = scaler.transform(emb)
+        emb_pca = pca.transform(emb_scaled)
+
+        pred = label_encoder.inverse_transform(
+            [label_encoder.classes_[pca.predict(emb_pca)][0]]
+        )
+
+        return jsonify({
+            "category": pred[0],
+            "language": lang
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
