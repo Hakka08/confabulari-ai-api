@@ -4,6 +4,13 @@ import joblib
 from deep_translator import GoogleTranslator
 from langdetect import detect
 
+app = Flask(__name__)     # <--- PRIMA COSA DA FARE: crea l'app Flask
+
+@app.route("/")
+def home():
+    return {"message": "API attiva"}
+
+
 print("Carico il modello HuggingFace...")
 embedder = SentenceTransformer("sentence-transformers/paraphrase-MiniLM-L6-v2")
 
@@ -14,7 +21,6 @@ label_encoder = joblib.load("label_encoder.pkl")
 
 print("Modelli caricati.")
 
-app = Flask(__name__)
 
 @app.route("/predict", methods=["POST"])
 def predict():
