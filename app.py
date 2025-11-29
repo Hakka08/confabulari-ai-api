@@ -1,42 +1,47 @@
-from flask import Flask, request, jsonify
 import joblib
-from deep_translator import GoogleTranslator
-from langdetect import detect
+import requests
 import os
-
-# Carica il modello una volta sola
-pipeline = joblib.load("pipelineWEB.pkl")
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+MODEL_URL = "https://drive.google.com/uc?export=download&id=176bL6Ez1X2K9JMe9qZ0idO2lxE98at78"
+MODEL_PATH = "pipelineWEB.pkl"
+
+
+def download_model():
+    if not os.path.exists(MODEL_PATH):
+        print("Scarico il modello da Google Drive...")
+        response = requests.get(MODEL_URL, stream=True)
+
+        if response.status_code != 200:
+            raise Exception(f"Errore download: {response.status_code}")
+
+        with open(MODEL_PATH, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        print("Modello scaricato correttamente!")
+
+
+print("Controllo modello...")
+download_model()
+pipeline = joblib.load(MODEL_PATH)
+print("Modello caricato!")
+
+
+@app.route("/")
+def home():
+    return "API online!"
+
+
 @app.route("/predict", methods=["POST"])
 def predict():
-    try:
-        data = request.json
-        frase = data.get("text", "")
-
-        sentence = GoogleTranslator(source='auto', target='en').translate(frase)
-        language_detected = detect(frase)
-
-        embedding = pipeline["embedder"].encode(
-            [sentence],
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
-        embedding_scaled = pipeline["scaler"].transform(embedding)
-        embedding_pca = pipeline["pca"].transform(embedding_scaled)
-        prediction = pipeline["classifier"].predict(embedding_pca)
-        category = pipeline["label_encoder"].inverse_transform(prediction)[0]
-
-        return jsonify({
-            "category": category,
-            "language": language_detected
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    data = request.json.get("text", "")
+    prediction = pipeline.predict([data])[0]
+    return jsonify({"prediction": prediction})
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=8080)
