@@ -1,6 +1,8 @@
 flask
+sentence-transformers
+scikit-learn
 joblib
 deep-translator
 langdetect
-scikit-learn
 gunicorn
+numpy
