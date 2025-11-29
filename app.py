@@ -3,59 +3,78 @@ from sentence_transformers import SentenceTransformer
 import joblib
 from deep_translator import GoogleTranslator
 from langdetect import detect
+import numpy as np
 
-app = Flask(__name__)     # <--- PRIMA COSA DA FARE: crea l'app Flask
+# ---------------------------------------------------------
+# INIZIALIZZAZIONE APP
+# ---------------------------------------------------------
+app = Flask(__name__)
+
 
 @app.route("/")
 def home():
     return {"message": "API attiva"}
 
 
-print("Carico il modello HuggingFace...")
+# ---------------------------------------------------------
+# CARICAMENTO MODELLI
+# ---------------------------------------------------------
+
+print("Carico embedder da HuggingFace...")
 embedder = SentenceTransformer("sentence-transformers/paraphrase-MiniLM-L6-v2")
 
-print("Carico scaler, pca, label encoder...")
+print("Carico scaler, pca, classifier, label encoder...")
 scaler = joblib.load("scaler.pkl")
 pca = joblib.load("pca.pkl")
+clf = joblib.load("classifier.pkl")
 label_encoder = joblib.load("label_encoder.pkl")
 
-print("Modelli caricati.")
+print("Modelli caricati con successo.")
 
 
+# ---------------------------------------------------------
+# PREDICT ENDPOINT
+# ---------------------------------------------------------
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
         data = request.json
-        frase = data.get("text", "")
+        text = data.get("text", "").strip()
 
-        # Traduzione verso inglese
-        frase_en = GoogleTranslator(source='auto', target='en').translate(frase)
+        if text == "":
+            return jsonify({"error": "Campo 'text' mancante"}), 400
+
+        # Traduzione auto → inglese
+        text_en = GoogleTranslator(source="auto", target="en").translate(text)
 
         # Lingua originale
-        lang = detect(frase)
+        lang = detect(text)
 
-        # Embedding
-        emb = embedder.encode(
-            [frase_en],
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
+        # EMBEDDING
+        emb = embedder.encode([text_en],
+                              convert_to_numpy=True,
+                              normalize_embeddings=True)
 
+        # SCALING + PCA
         emb_scaled = scaler.transform(emb)
         emb_pca = pca.transform(emb_scaled)
 
-        pred = label_encoder.inverse_transform(
-            [label_encoder.classes_[pca.predict(emb_pca)][0]]
-        )
+        # CLASSIFICAZIONE
+        pred_class = clf.predict(emb_pca)[0]
+        category = label_encoder.inverse_transform([pred_class])[0]
 
         return jsonify({
-            "category": pred[0],
-            "language": lang
+            "category": category,
+            "language": lang,
+            "translated_text": text_en
         })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
+# ---------------------------------------------------------
+# RUN LOCALE (Railway ignora questa parte)
+# ---------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
