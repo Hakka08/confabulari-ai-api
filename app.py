@@ -10,7 +10,6 @@ import numpy as np
 # ---------------------------------------------------------
 app = Flask(__name__)
 
-
 @app.route("/")
 def home():
     return {"message": "API attiva"}
@@ -20,8 +19,8 @@ def home():
 # CARICAMENTO MODELLI
 # ---------------------------------------------------------
 
-print("Carico embedder da HuggingFace...")
-embedder = SentenceTransformer("sentence-transformers/paraphrase-MiniLM-L6-v2")
+print("Carico embedder MPNet (768-d)...")
+embedder = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 print("Carico scaler, pca, classifier, label encoder...")
 scaler = joblib.load("scaler.pkl")
@@ -33,7 +32,7 @@ print("Modelli caricati con successo.")
 
 
 # ---------------------------------------------------------
-# PREDICT ENDPOINT
+# PREDICT
 # ---------------------------------------------------------
 @app.route("/predict", methods=["POST"])
 def predict():
@@ -44,16 +43,18 @@ def predict():
         if text == "":
             return jsonify({"error": "Campo 'text' mancante"}), 400
 
-        # Traduzione auto → inglese
+        # Traduzione verso inglese
         text_en = GoogleTranslator(source="auto", target="en").translate(text)
 
         # Lingua originale
         lang = detect(text)
 
-        # EMBEDDING
-        emb = embedder.encode([text_en],
-                              convert_to_numpy=True,
-                              normalize_embeddings=True)
+        # EMBEDDING (768-d)
+        emb = embedder.encode(
+            [text_en],
+            convert_to_numpy=True,
+            normalize_embeddings=True
+        )
 
         # SCALING + PCA
         emb_scaled = scaler.transform(emb)
@@ -74,7 +75,7 @@ def predict():
 
 
 # ---------------------------------------------------------
-# RUN LOCALE (Railway ignora questa parte)
+# LOCALE
 # ---------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
