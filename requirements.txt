@@ -1,3 +1,6 @@
+--index-url https://download.pytorch.org/whl/cpu
+--extra-index-url https://pypi.org/simple
+
 flask
 sentence-transformers
 scikit-learn
@@ -5,4 +8,3 @@ joblib
 deep-translator
 langdetect
 gunicorn
-numpy
