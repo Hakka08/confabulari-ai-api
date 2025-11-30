@@ -19,10 +19,8 @@ def home():
 # CARICAMENTO MODELLI
 # ---------------------------------------------------------
 
-print("Carico embedder MPNet (768-d)...")
 embedder = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
-print("Carico scaler, pca, classifier, label encoder...")
 scaler = joblib.load("scaler.pkl")
 pca = joblib.load("pca.pkl")
 clf = joblib.load("classifier.pkl")
@@ -67,7 +65,6 @@ def predict():
         return jsonify({
             "category": category,
             "language": lang,
-            "translated_text": text_en
         })
 
     except Exception as e:
