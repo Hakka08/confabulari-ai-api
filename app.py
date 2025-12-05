@@ -19,7 +19,7 @@ def home():
 # CARICAMENTO MODELLI
 # ---------------------------------------------------------
 
-embedder = SentenceTransformer("sentence-transformers/distiluse-base-multilingual-cased-v1")
+embedder = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
 
 scaler = joblib.load("scaler.pkl")
 pca = joblib.load("pca.pkl")
